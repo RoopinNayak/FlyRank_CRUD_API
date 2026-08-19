@@ -63,14 +63,16 @@ app.get('/tasks/:id', (req, res) => {
   res.status(200).json(formatTask(row));
 });
 
+// --- Create endpoint (SQLite-backed) ---
 app.post('/tasks', (req, res) => {
   const { title } = req.body;
   if (!title || typeof title !== 'string' || !title.trim()) {
     return res.status(400).json({ error: 'Title is required and cannot be empty' });
   }
   const result = db.prepare('INSERT INTO tasks (title, done) VALUES (?, 0)').run(title.trim());
-  const newTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
-  res.status(201).json(formatTask(newTask));
+  // Fetch the newly inserted row using the auto-generated id
+  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json(formatTask(row));
 });
 
 app.put('/tasks/:id', (req, res) => {
