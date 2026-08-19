@@ -48,18 +48,19 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
+// --- Read endpoints (SQLite-backed) ---
 app.get('/tasks', (req, res) => {
-  const tasks = db.prepare('SELECT * FROM tasks').all();
-  res.status(200).json(tasks.map(formatTask));
+  const rows = db.prepare('SELECT * FROM tasks').all();
+  res.status(200).json(rows.map(formatTask));
 });
 
 app.get('/tasks/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
-  if (!task) {
-    return res.status(404).json({ error: `Task ${id} not found` });
+  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  if (!row) {
+    return res.status(404).json({ error: 'Task not found' });
   }
-  res.status(200).json(formatTask(task));
+  res.status(200).json(formatTask(row));
 });
 
 app.post('/tasks', (req, res) => {
