@@ -12,26 +12,35 @@ A minimal RESTful CRUD API built with **Node.js** and **Express** for managing t
 - Interactive API docs at `/docs` via Swagger UI
 - Health check endpoint
 
+## Why SQLite?
+
+SQLite was chosen as the database solution for this project because:
+- **Serverless**: No separate database server process or daemon to install, run, or manage.
+- **Zero Configuration**: No user authentication, environment setups, or port configurations required.
+- **Single File Persistence**: The entire database lives in a single local disk file (`tasks.db`), making development, testing, and inspection simple and lightweight.
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) v16 or later
 - npm (bundled with Node.js)
 
-## Installation
+## Quick Start (Installation & Execution)
+
+Clone the repository and run the application using a single command:
 
 ```bash
-git clone https://github.com/RoopinNayak/FlyRank_CRUD_API.git
-cd FlyRank_CRUD_API
-npm install
+npm install && npm start
 ```
 
-## Running the Server
+*(Alternatively, for a fresh clone: `git clone https://github.com/RoopinNayak/FlyRank_CRUD_API.git && cd FlyRank_CRUD_API && npm install && npm start`)*
 
-```bash
-npm start
-```
+The server starts at **http://localhost:3000**.
 
-The server starts at **http://localhost:3000**. On first run, a `tasks.db` file is created automatically and seeded with 3 sample tasks.
+## Database Setup & Location Details
+
+- **Database File Location**: The database is stored locally in `./tasks.db` at the root of the project directory.
+- **Automatic Initialization**: On server startup, `tasks.db` is created automatically if it does not already exist, and seeded with 3 sample tasks if the table is empty.
+- **Version Control Safety**: `tasks.db` (along with WAL journal files) is explicitly listed in `.gitignore` so that local database state is not tracked in Git. Each clone automatically creates its own fresh database file on initial startup.
 
 ## API Endpoints
 
@@ -68,7 +77,7 @@ Keep-Alive: timeout=5
 ]
 ```
 
-## SQLite Database
+## SQLite Database & DB Browser Integration
 
 The API uses `tasks.db` as its **single source of truth**. Both the Express API and external tools (like DB Browser for SQLite) read and write to the same file — changes made in one are instantly visible in the other, with no server restart required.
 
@@ -84,12 +93,14 @@ You can open `tasks.db` in [DB Browser for SQLite](https://sqlitebrowser.org/) o
 | `UPDATE tasks SET done = 1;` | Mark all tasks as complete |
 | `DELETE FROM tasks WHERE done = 1;` | Remove all completed tasks |
 
-### Example: Direct Database Query
+### Example Query Executed in DB Browser & Output
 
+**Query:**
 ```sql
 SELECT * FROM tasks WHERE done = 0;
 ```
 
+**Output:**
 ```
 id  title                 done
 --  --------------------  ----
@@ -97,11 +108,11 @@ id  title                 done
 3   Write documentation   0
 ```
 
-This returns all incomplete tasks. Because the API reads from `tasks.db` on every request, any change you make here (e.g., manually updating a `done` value in DB Browser and clicking **Write Changes**) is immediately reflected when you call `curl http://localhost:3000/tasks` — no restart needed.
+*Explanation*: This query retrieves all incomplete tasks directly from the database. Because `tasks.db` is the single source of truth, any edits saved in DB Browser immediately reflect on API responses (e.g. `curl http://localhost:3000/tasks`) without needing a server restart.
 
-### DB Browser for SQLite
+### DB Browser Screenshot
 
-![DB Browser for SQLite showing the tasks table](db_browser.png)
+![DB Browser](db-browser.png)
 
 ## Interactive Documentation
 
@@ -117,7 +128,7 @@ Swagger UI is served at **http://localhost:3000/docs** — use the **Try it out*
 ├── tasks.db          # SQLite database (auto-created, git-ignored)
 ├── package.json      # Project metadata & dependencies
 ├── swagger.png       # Swagger UI screenshot
-├── db_browser.png    # DB Browser for SQLite screenshot
+├── db-browser.png    # DB Browser for SQLite screenshot
 ├── .gitignore        # Ignores node_modules and tasks.db
 └── README.md
 ```
