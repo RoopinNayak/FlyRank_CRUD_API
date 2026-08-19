@@ -75,11 +75,12 @@ app.post('/tasks', (req, res) => {
   res.status(201).json(formatTask(row));
 });
 
+// --- Update endpoint (SQLite-backed) ---
 app.put('/tasks/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
-  if (!task) {
-    return res.status(404).json({ error: `Task ${id} not found` });
+  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  if (!row) {
+    return res.status(404).json({ error: 'Task not found' });
   }
   const { title, done } = req.body;
   if (title !== undefined && (typeof title !== 'string' || !title.trim())) {
@@ -88,18 +89,24 @@ app.put('/tasks/:id', (req, res) => {
   if (done !== undefined && typeof done !== 'boolean') {
     return res.status(400).json({ error: 'Done must be a boolean' });
   }
-  const updatedTitle = title !== undefined ? title.trim() : task.title;
-  const updatedDone = done !== undefined ? (done ? 1 : 0) : task.done;
+  const updatedTitle = title !== undefined ? title.trim() : row.title;
+  const updatedDone = done !== undefined ? (done ? 1 : 0) : row.done;
+  // Run parameterized UPDATE query
   db.prepare('UPDATE tasks SET title = ?, done = ? WHERE id = ?').run(updatedTitle, updatedDone, id);
-  res.status(200).json({ id, title: updatedTitle, done: !!updatedDone });
+  // Re-fetch the updated row to return the confirmed state
+  const updated = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  res.status(200).json(formatTask(updated));
 });
 
+// --- Delete endpoint (SQLite-backed) ---
 app.delete('/tasks/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const result = db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
-  if (result.changes === 0) {
-    return res.status(404).json({ error: `Task ${id} not found` });
+  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  if (!row) {
+    return res.status(404).json({ error: 'Task not found' });
   }
+  // Run parameterized DELETE query
+  db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
   res.status(204).send();
 });
 
