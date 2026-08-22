@@ -1,136 +1,144 @@
-# Task API
+# Task API — Containerized Express & PostgreSQL Stack
 
-A minimal RESTful CRUD API built with **Node.js** and **Express** for managing tasks. Data is persisted in a **SQLite** database via `better-sqlite3`. Includes input validation, proper HTTP status codes, and interactive API documentation powered by **Swagger UI**.
+A RESTful CRUD API built with **Node.js**, **Express**, and **PostgreSQL** (`pg` driver). The entire stack (Express API server + PostgreSQL database) is fully containerized and orchestrated using **Docker Compose** with data persistence via named Docker volumes.
+
+Includes input validation, parameterized SQL queries, proper HTTP status codes, and interactive API documentation powered by **Swagger UI**.
 
 ---
 
-## Features
+## Architecture Overview
 
-- Full CRUD operations backed by a SQLite database (`tasks.db`)
-- Data persists across server restarts
-- Input validation with descriptive error messages
-- Interactive API docs at `/docs` via Swagger UI
-- Health check endpoint
+This project has evolved from SQLite file-based persistence to a scalable, containerized microservices architecture:
 
-## Why SQLite?
+- **Express API Service (`api`)**: Containerized Node.js app built on `node:alpine`. Connects to PostgreSQL using `pg` connection pool.
+- **PostgreSQL Database (`db`)**: Running PostgreSQL 17 in a dedicated Docker container.
+- **Data Persistence (`taskdata`)**: Named Docker volume mapped to `/var/lib/postgresql/data` ensuring database records persist across container teardowns (`docker compose down`).
+- **Container Networking**: Services communicate over a isolated Docker bridge network using service names (`db:5432`).
 
-SQLite was chosen as the database solution for this project because:
-- **Serverless**: No separate database server process or daemon to install, run, or manage.
-- **Zero Configuration**: No user authentication, environment setups, or port configurations required.
-- **Single File Persistence**: The entire database lives in a single local disk file (`tasks.db`), making development, testing, and inspection simple and lightweight.
+---
 
-## Prerequisites
+## One-Command Stack Setup & Execution
 
-- [Node.js](https://nodejs.org/) v16 or later
-- npm (bundled with Node.js)
-
-## Quick Start (Installation & Execution)
-
-Clone the repository and run the application using a single command:
+Run the complete multi-container stack with a single command:
 
 ```bash
-npm install && npm start
+cp .env.example .env && docker compose up --build
 ```
 
-*(Alternatively, for a fresh clone: `git clone https://github.com/RoopinNayak/FlyRank_CRUD_API.git && cd FlyRank_CRUD_API && npm install && npm start`)*
+The Express server starts at **http://localhost:3000** and PostgreSQL runs on **localhost:5432**.
 
-The server starts at **http://localhost:3000**.
+To stop the stack:
+```bash
+docker compose down
+```
 
-## Database Setup & Location Details
+---
 
-- **Database File Location**: The database is stored locally in `./tasks.db` at the root of the project directory.
-- **Automatic Initialization**: On server startup, `tasks.db` is created automatically if it does not already exist, and seeded with 3 sample tasks if the table is empty.
-- **Version Control Safety**: `tasks.db` (along with WAL journal files) is explicitly listed in `.gitignore` so that local database state is not tracked in Git. Each clone automatically creates its own fresh database file on initial startup.
+## Environment Variables
+
+Environment variables are managed via `.env` (git-ignored) and referenced by `.env.example`.
+
+| Variable | Description | Local / Docker Example |
+|----------|-------------|-------------------------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgres://postgres:dev@localhost:5432/tasks` (Local)<br>`postgres://postgres:dev@db:5432/tasks` (Docker Compose) |
+
+### `.env.example`
+```env
+DATABASE_URL=postgres://postgres:dev@localhost:5432/tasks
+```
+
+---
 
 ## API Endpoints
 
-| Method | Path | Request Body | Success | Error | Description |
-|--------|------|--------------|---------|-------|-------------|
-| `GET` | `/` | — | `200` | — | API info and available endpoints |
-| `GET` | `/health` | — | `200` | — | Health check |
-| `GET` | `/tasks` | — | `200` | — | List all tasks |
-| `GET` | `/tasks/:id` | — | `200` | `404` | Get a single task by ID |
-| `POST` | `/tasks` | `{ "title": "string" }` | `201` | `400` | Create a new task |
-| `PUT` | `/tasks/:id` | `{ "title?": "string", "done?": boolean }` | `200` | `400` `404` | Update a task |
-| `DELETE` | `/tasks/:id` | — | `204` | `404` | Delete a task |
+| Method | Path | Request Body | Success | Error Statuses | Description |
+|--------|------|--------------|---------|----------------|-------------|
+| `GET` | `/` | — | `200 OK` | — | API metadata & endpoint list |
+| `GET` | `/health` | — | `200 OK` | — | Health check endpoint |
+| `GET` | `/tasks` | — | `200 OK` | — | Retrieve all tasks |
+| `GET` | `/tasks/:id` | — | `200 OK` | `404 Not Found` | Retrieve a single task by ID |
+| `POST` | `/tasks` | `{ "title": "string" }` | `201 Created` | `400 Bad Request` | Create a new task |
+| `PUT` | `/tasks/:id` | `{ "title?": "string", "done?": boolean }` | `200 OK` | `400 Bad Request`, `404 Not Found` | Update task title and/or done status |
+| `DELETE` | `/tasks/:id` | — | `204 No Content` | `404 Not Found` | Delete a task by ID |
 
-## Example Request
+---
 
+## Sample Request & Response
+
+### `GET /tasks`
 ```bash
 curl -i http://localhost:3000/tasks
 ```
 
-```
+```http
 HTTP/1.1 200 OK
 X-Powered-By: Express
 Content-Type: application/json; charset=utf-8
-Content-Length: 190
-ETag: W/"be-IOch9YMhFnLtEhJ5PqxRY70kd7Q"
-Date: Wed, 19 Aug 2026 08:05:52 GMT
+Content-Length: 197
+ETag: W/"c5-i0fFAl6sYYlXfwQdiWhklFlPCTY"
+Date: Sat, 22 Aug 2026 15:56:46 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
 [
   { "id": 1, "title": "Set up project", "done": true },
   { "id": 2, "title": "Create API routes", "done": false },
-  { "id": 3, "title": "Write documentation", "done": false }
+  { "id": 3, "title": "Write documentation", "done": false },
+  { "id": 4, "title": "Persistent Task", "done": false }
 ]
 ```
 
-## SQLite Database & DB Browser Integration
-
-The API uses `tasks.db` as its **single source of truth**. Both the Express API and external tools (like DB Browser for SQLite) read and write to the same file — changes made in one are instantly visible in the other, with no server restart required.
-
-### Useful SQL Queries
-
-You can open `tasks.db` in [DB Browser for SQLite](https://sqlitebrowser.org/) or the `sqlite3` CLI and run these queries directly:
-
-| Query | Description |
-|-------|-------------|
-| `SELECT * FROM tasks;` | View all tasks |
-| `SELECT * FROM tasks WHERE done = 1;` | View only completed tasks |
-| `SELECT COUNT(*) FROM tasks;` | Count total tasks |
-| `UPDATE tasks SET done = 1;` | Mark all tasks as complete |
-| `DELETE FROM tasks WHERE done = 1;` | Remove all completed tasks |
-
-### Example Query Executed in DB Browser & Output
-
-**Query:**
-```sql
-SELECT * FROM tasks WHERE done = 0;
+### `POST /tasks`
+```bash
+curl -i -X POST http://localhost:3000/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Docker task"}'
 ```
 
-**Output:**
+```http
+HTTP/1.1 201 Created
+Content-Type: application/json; charset=utf-8
+
+{"id":5,"title":"Docker task","done":false}
 ```
-id  title                 done
---  --------------------  ----
-2   Create API routes     0
-3   Write documentation   0
+
+---
+
+## Database Inspection
+
+You can inspect the PostgreSQL database directly inside the container using `psql`:
+
+```bash
+docker exec -it first_crud_api-db-1 psql -U postgres -d tasks -c "SELECT * FROM tasks;"
 ```
 
-*Explanation*: This query retrieves all incomplete tasks directly from the database. Because `tasks.db` is the single source of truth, any edits saved in DB Browser immediately reflect on API responses (e.g. `curl http://localhost:3000/tasks`) without needing a server restart.
+![Postgres Data](db-screenshot.png)
 
-### DB Browser Screenshot
+---
 
-![DB Browser](db-browser.png)
+## Interactive API Documentation
 
-## Interactive Documentation
-
-Swagger UI is served at **http://localhost:3000/docs** — use the **Try it out** buttons to test every endpoint directly from the browser.
+Interactive Swagger UI is served at **http://localhost:3000/docs**.
 
 ![Swagger UI](swagger.png)
+
+---
 
 ## Project Structure
 
 ```
 ├── index.js          # Express server & route handlers
+├── db.js             # PostgreSQL pool & auto-migration module
 ├── openapi.json      # OpenAPI 3.0 specification
-├── tasks.db          # SQLite database (auto-created, git-ignored)
-├── package.json      # Project metadata & dependencies
-├── swagger.png       # Swagger UI screenshot
-├── db-browser.png    # DB Browser for SQLite screenshot
-├── .gitignore        # Ignores node_modules and tasks.db
-└── README.md
+├── Dockerfile        # Container build instructions for Express API
+├── compose.yaml      # Docker Compose multi-container stack
+├── .dockerignore     # Docker build exclusions
+├── .env.example      # Environment variable template
+├── .gitignore        # Git tracking exclusions (ignores .env, node_modules)
+├── package.json      # Dependencies and start scripts
+├── db-screenshot.png # PostgreSQL database inspection screenshot
+├── swagger.png       # Swagger UI documentation screenshot
+└── README.md         # Documentation
 ```
 
 ## License
