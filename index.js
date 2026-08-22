@@ -1,17 +1,13 @@
 const express = require('express');
-const Database = require('better-sqlite3');
 const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./openapi.json');
+const db = require('./db');
+
 const app = express();
 const PORT = 3000;
 
-const { initDb } = require('./db');
-
 // Initialize PostgreSQL table and seed data on startup
-initDb().catch((err) => console.error('Database initialization error:', err));
-
-// --- Helpers ---
-const formatTask = (row) => ({ id: row.id, title: row.title, done: !!row.done });
+db.initDb().catch((err) => console.error('Database initialization error:', err));
 
 // --- Middleware ---
 app.use(express.json());
@@ -26,19 +22,32 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// --- Read endpoints (SQLite-backed) ---
-app.get('/tasks', (req, res) => {
-  const rows = db.prepare('SELECT * FROM tasks').all();
-  res.status(200).json(rows.map(formatTask));
+// --- Read endpoints (PostgreSQL-backed) ---
+app.get('/tasks', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM tasks ORDER BY id ASC;');
+    res.status(200).json(result.rows);
+  } catch (err) {
+    console.error('Error fetching tasks:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-app.get('/tasks/:id', (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
-  if (!row) {
-    return res.status(404).json({ error: 'Task not found' });
+app.get('/tasks/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    const result = await db.query('SELECT * FROM tasks WHERE id = $1;', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    res.status(200).json(result.rows[0]);
+  } catch (err) {
+    console.error('Error fetching task by ID:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  res.status(200).json(formatTask(row));
 });
 
 // --- Create endpoint (SQLite-backed) ---
