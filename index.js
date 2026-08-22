@@ -5,32 +5,10 @@ const swaggerDocument = require('./openapi.json');
 const app = express();
 const PORT = 3000;
 
-// --- Database setup ---
-const db = new Database('tasks.db');
-db.pragma('journal_mode = WAL');
+const { initDb } = require('./db');
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS tasks (
-    id    INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT    NOT NULL,
-    done  INTEGER NOT NULL DEFAULT 0
-  )
-`);
-
-// Seed only when the table is empty
-const { count } = db.prepare('SELECT COUNT(*) AS count FROM tasks').get();
-if (count === 0) {
-  const insert = db.prepare('INSERT INTO tasks (title, done) VALUES (?, ?)');
-  const seedMany = db.transaction((items) => {
-    for (const item of items) insert.run(item.title, item.done);
-  });
-  seedMany([
-    { title: 'Set up project', done: 1 },
-    { title: 'Create API routes', done: 0 },
-    { title: 'Write documentation', done: 0 },
-  ]);
-  console.log('Seeded 3 sample tasks.');
-}
+// Initialize PostgreSQL table and seed data on startup
+initDb().catch((err) => console.error('Database initialization error:', err));
 
 // --- Helpers ---
 const formatTask = (row) => ({ id: row.id, title: row.title, done: !!row.done });
